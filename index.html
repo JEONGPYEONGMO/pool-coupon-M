@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏊 수영장 쿠폰 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Noto Sans KR',sans-serif; min-height:100vh;
+    background:linear-gradient(135deg,#0e7490 0%,#059669 50%,#10b981 100%);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .container { max-width:400px; width:100%; text-align:center; }
+  .logo { font-size:64px; margin-bottom:16px; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+  h1 { font-family:'Outfit',sans-serif; font-size:28px; font-weight:800; color:#fff; margin-bottom:8px; }
+  .sub { font-size:14px; color:rgba(255,255,255,0.8); margin-bottom:40px; }
+  .card {
+    display:block; padding:24px; border-radius:18px; background:rgba(255,255,255,0.95);
+    text-decoration:none; margin-bottom:16px; transition:all 0.2s;
+    box-shadow:0 8px 30px rgba(0,0,0,0.15);
+  }
+  .card:active { transform:scale(0.97); }
+  .card-icon { font-size:40px; margin-bottom:8px; }
+  .card-title { font-size:18px; font-weight:800; margin-bottom:4px; }
+  .card-desc { font-size:13px; color:#64748b; }
+  .card-admin .card-title { color:#0e7490; }
+  .card-member .card-title { color:#059669; }
+  .footer { margin-top:30px; font-size:11px; color:rgba(255,255,255,0.5); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">🏊‍♂️</div>
+  <h1>수영장 쿠폰</h1>
+  <p class="sub">쿠폰 관리 · 실시간 조회</p>
+  
+  <a href="/admin.html" class="card card-admin">
+    <div class="card-icon">🎫</div>
+    <div class="card-title">관리자</div>
+    <div class="card-desc">쿠폰 사용 처리 · 회원 관리 · 내역 조회</div>
+  </a>
+  
+  <a href="/member.html" class="card card-member">
+    <div class="card-icon">🏊</div>
+    <div class="card-title">회원 조회</div>
+    <div class="card-desc">내 쿠폰 잔여 확인 · 사용 내역 보기</div>
+  </a>
+  
+  <div class="footer">Firebase 실시간 연동 · PWA 지원</div>
+</div>
+</body>
+</html>

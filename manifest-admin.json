@@ -1,0 +1,14 @@
+{
+  "name": "수영장 쿠폰 관리",
+  "short_name": "쿠폰관리",
+  "description": "수영장 쿠폰 발행·사용 관리 시스템",
+  "start_url": "/admin.html",
+  "display": "standalone",
+  "background_color": "#0e7490",
+  "theme_color": "#0e7490",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/admin-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/admin-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
