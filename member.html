@@ -88,7 +88,7 @@
 
 <script>
 const SELECTED_KEY = "pool-selected-member";
-let data = { members:[], history:[] };
+let data = { members:[], history:[], settings:{} };
 let db = null;
 let firebaseConnected = false;
 let selectedMemberId = localStorage.getItem(SELECTED_KEY) || null;
@@ -116,6 +116,7 @@ function initFirebase(config) {
       if(val){
         data.members=val.members?Object.values(val.members):[];
         data.history=val.history?Object.values(val.history):[];
+        data.settings=val.settings||{};
         render();
       }
     });
@@ -151,6 +152,61 @@ function changeMonth(delta) {
   render();
 }
 
+const DEFAULT_NOTICES = [
+  { id:'n1', type:'table', title:'티켓 안내', rows:[
+    {label:'40매', price:'16,000원', until:'~26.03.06.'},
+    {label:'30~39매', price:'18,000원', until:'~26.03.06.'},
+    {label:'20~29매', price:'20,000원', until:'~26.06.30.'},
+    {label:'10~19매', price:'22,000원', until:'~26.09.30.'},
+    {label:'5~9매', price:'24,000원', until:'~27.02.07. 상시'},
+  ], lines:[
+    '💳 구매  연중 수시 구매 가능 (단가별 기한 확인) · 인당 최소 5매~최대 40매 · 현금 구매 only',
+    '📅 기한  2027년 2월 말까지 (최소 40회 세션 예정)',
+    '🔄 양도  양도 불가 · 환불 가능 (티켓 규정 확인 바랍니다.)',
+  ]},
+];
+
+function getNotices() {
+  if(data.settings && data.settings.notices && data.settings.notices.length>0)
+    return data.settings.notices;
+  return DEFAULT_NOTICES;
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function renderNoticeCard(n) {
+  if(n.type==='table') {
+    const rows=(n.rows||[]).map((r,i)=>'<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+';border-bottom:1px solid #e2e8f0;">'
+      +'<td style="padding:7px 8px;font-weight:700;color:#065f46;">'+r.label+'</td>'
+      +'<td style="padding:7px 8px;text-align:center;font-weight:700;color:#059669;">'+r.price+'</td>'
+      +'<td style="padding:7px 8px;text-align:center;color:#64748b;">'+r.until+'</td>'
+      +'</tr>').join('');
+    const lines=(n.lines||[]).map(l=>'<div>'+escHtml(l)+'</div>').join('');
+    return '<div style="border-radius:14px;border:2px solid #10b981;background:linear-gradient(135deg,#f0fdf4,#ecfeff);padding:16px;margin-bottom:12px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
+      +'<span style="font-size:18px;">📋</span>'
+      +'<span style="font-size:15px;font-weight:800;color:#065f46;">'+escHtml(n.title||'티켓 안내')+'</span>'
+      +'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;">'
+      +'<thead><tr style="background:#059669;color:#fff;">'
+      +'<th style="padding:7px 8px;text-align:left;font-weight:700;">구매 매수</th>'
+      +'<th style="padding:7px 8px;text-align:center;font-weight:700;">단가</th>'
+      +'<th style="padding:7px 8px;text-align:center;font-weight:700;">판매 기한</th>'
+      +'</tr></thead><tbody>'+rows+'</tbody></table>'
+      +(lines?'<div style="font-size:12px;color:#475569;border-top:1px solid #a7f3d0;padding-top:10px;display:flex;flex-direction:column;gap:5px;">'+lines+'</div>':'')
+      +'</div>';
+  } else {
+    const bodyHtml = escHtml(n.body||'').replace(/\n/g,'<br>');
+    return '<div style="border-radius:14px;border:2px solid #f59e0b;background:linear-gradient(135deg,#fffbeb,#fefce8);padding:16px;margin-bottom:12px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+      +'<span style="font-size:18px;">📢</span>'
+      +'<span style="font-size:15px;font-weight:800;color:#92400e;">'+escHtml(n.title)+'</span>'
+      +'</div>'
+      +'<div style="font-size:13px;color:#44403c;line-height:1.7;">'+bodyHtml+'</div>'
+      +'</div>';
+  }
+}
+
 function getRingColor(m) {
   if(m.remaining===0) return {bg:"#fef2f2",border:"#ef4444",text:"#ef4444"};
   if(m.remaining<=2) return {bg:"#fffbeb",border:"#f59e0b",text:"#d97706"};
@@ -166,7 +222,9 @@ function render() {
 }
 
 function renderList(el,members) {
-  let html='<div style="margin-bottom:16px;">'
+  // 공지사항 (Firebase settings.notices 우선, 없으면 기본값)
+  let html = getNotices().map(n=>renderNoticeCard(n)).join('');
+  html += '<div style="margin-bottom:16px;">'
     +'<p style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">내 이름을 선택하세요</p>'
     +'<p style="font-size:12px;color:#94a3b8;">실시간으로 쿠폰 잔여와 이용 내역을 확인할 수 있습니다</p>'
     +'</div>';
