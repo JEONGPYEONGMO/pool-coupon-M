@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="badge-images.js"></script>
 <style>
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0; }
 body { font-family:'Noto Sans KR',sans-serif; background:#f0fdf4; min-height:100vh; }
@@ -98,6 +99,11 @@ body { font-family:'Noto Sans KR',sans-serif; background:#f0fdf4; min-height:100
 .badge-date { font-size:10px; color:#d97706; margin-top:4px; font-weight:600; }
 .badge-desc { font-size:10px; color:#94a3b8; margin-top:3px; }
 
+.rank-row { display:flex; align-items:center; gap:10px; padding:12px; border-radius:12px; background:#fff; border:1.5px solid #e2e8f0; margin-bottom:8px; }
+.rank-medal { font-size:24px; width:36px; text-align:center; flex-shrink:0; }
+.rank-bar { height:8px; border-radius:4px; background:#f1f5f9; overflow:hidden; }
+.rank-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#0891b2,#06b6d4); }
+
 .notice-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:12px; }
 .notice-table th { background:#059669; color:#fff; padding:7px 8px; font-weight:700; }
 .notice-table td { padding:7px 8px; border-bottom:1px solid #e2e8f0; }
@@ -153,11 +159,13 @@ body { font-family:'Noto Sans KR',sans-serif; background:#f0fdf4; min-height:100
 
   <div class="top-tabs">
     <button class="top-tab-btn active" id="tabBtnInfo"   onclick="switchTab('info')">👤 내 정보</button>
+    <button class="top-tab-btn"        id="tabBtnRanking" onclick="switchTab('ranking')">🏆 랭킹</button>
     <button class="top-tab-btn"        id="tabBtnNotice" onclick="switchTab('notice')">📢 공지사항</button>
   </div>
 
   <div class="content">
     <div id="tabInfo"   class="fade-in"></div>
+    <div id="tabRanking" class="hidden"></div>
     <div id="tabNotice" class="hidden"></div>
   </div>
 </div>
@@ -207,7 +215,11 @@ function getRingColor(m){
   if(m.remaining<=3)  return {bg:'#fffbeb',border:'#f59e0b',text:'#d97706'};
   return {bg:'#ecfdf5',border:'#059669',text:'#059669'};
 }
-function getBadgeImg(b){ return b&&b.imageData?b.imageData:null; }
+function getBadgeImg(b){
+  if(!b) return null;
+  if(b.imageData) return b.imageData;
+  return findBadgeImage(b.name);
+}
 function changeMonth(delta){
   const [y,mo]=viewMonth.split('-').map(Number);
   const d=new Date(y,mo-1+delta,1);
@@ -273,15 +285,18 @@ function updateHeader(){
 function switchTab(tab){
   currentTab=tab;
   document.getElementById('tabBtnInfo').classList.toggle('active',tab==='info');
+  document.getElementById('tabBtnRanking').classList.toggle('active',tab==='ranking');
   document.getElementById('tabBtnNotice').classList.toggle('active',tab==='notice');
   document.getElementById('tabInfo').classList.toggle('hidden',tab!=='info');
+  document.getElementById('tabRanking').classList.toggle('hidden',tab!=='ranking');
   document.getElementById('tabNotice').classList.toggle('hidden',tab!=='notice');
   renderCurrentTab();
 }
 function renderCurrentTab(){
   updateHeader();
-  if(currentTab==='info')   renderInfo();
-  if(currentTab==='notice') renderNotice();
+  if(currentTab==='info')    renderInfo();
+  if(currentTab==='ranking') renderRanking();
+  if(currentTab==='notice')  renderNotice();
 }
 
 // ── INFO TAB ──
@@ -399,6 +414,48 @@ function renderInfo(){
     }).join('');
   }
   html+=`</div>`;
+  el.innerHTML=html;
+}
+
+// ── RANKING TAB ──
+function buildRanking(){
+  const counts={};
+  data.history.forEach(h=>{
+    if(h.type==="use"||h.type==="companion"||h.type==="guest"){
+      const n=h.memberName; if(!n)return;
+      if(!counts[n]) counts[n]={name:n,count:0};
+      counts[n].count++;
+    }
+  });
+  return Object.values(counts).sort((a,b)=>b.count-a.count);
+}
+function renderRanking(){
+  const el=document.getElementById('tabRanking'); if(!el)return;
+  const ranking=buildRanking();
+  const maxCount=ranking[0]?ranking[0].count:1;
+  const medals=["🥇","🥈","🥉"];
+  let html='<div class="card" style="border-color:#0891b2;border-width:2px;">'
+    +'<div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:4px;">🏆 참여 랭킹</div>'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:14px;">쿠폰 사용 + 동반 참석 + 현장 입장 통합</div>';
+  if(ranking.length===0){
+    html+='<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px;">참여 기록이 없습니다</div>';
+  } else {
+    html+=ranking.map((r,i)=>{
+      const medal=i<3?medals[i]:'<span style="font-size:14px;font-weight:700;color:#94a3b8;">'+(i+1)+'</span>';
+      const top=i<3?'border-color:#fbbf24;background:#fffbeb;':'';
+      return '<div class="rank-row" style="'+top+'">'
+        +'<div class="rank-medal">'+medal+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px;">'+esc(r.name)+'</div>'
+        +'<div class="rank-bar"><div class="rank-bar-fill" style="width:'+Math.round(r.count/maxCount*100)+'%;"></div></div>'
+        +'</div>'
+        +'<div style="text-align:right;flex-shrink:0;">'
+        +'<div style="font-family:\'Outfit\',sans-serif;font-size:22px;font-weight:800;color:#0891b2;">'+r.count+'</div>'
+        +'<div style="font-size:11px;color:#64748b;">회 참여</div>'
+        +'</div></div>';
+    }).join('');
+  }
+  html+='</div>';
   el.innerHTML=html;
 }
 

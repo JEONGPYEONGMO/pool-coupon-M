@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="badge-images.js"></script>
 <style>
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0; }
   body { font-family:'Noto Sans KR',sans-serif; background:linear-gradient(180deg,#ecfeff 0%,#f0f9ff 40%,#f8fafc 100%); min-height:100vh; }
@@ -91,6 +92,8 @@
   .rank-medal { font-size:22px; width:32px; text-align:center; flex-shrink:0; }
   .rank-bar { height:8px; border-radius:4px; background:#f1f5f9; overflow:hidden; flex:1; }
   .rank-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#0891b2,#06b6d4); }
+  .pw-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:#f8fafc; z-index:100; overflow-y:auto; }
+  .pw-overlay.hidden { display:none; }
   .pw-screen { display:flex; flex-direction:column; align-items:center; padding:60px 20px; gap:16px; }
   .pw-dots { display:flex; gap:12px; margin:8px 0 4px; }
   .pw-dot { width:16px; height:16px; border-radius:50%; border:2px solid #cbd5e1; transition:all 0.2s; }
@@ -139,6 +142,7 @@
 </div></div>
 
 <div id="mainApp" class="hidden">
+  <div id="pwOverlay" class="pw-overlay"><div class="pw-screen"><div style="font-size:56px;">🔒</div><div style="font-size:16px;font-weight:700;color:#0f172a;">관리자 비밀번호 입력</div><div style="font-size:13px;color:#94a3b8;">관리자 화면에 접근하려면 비밀번호를 입력하세요</div><div class="pw-dots" id="pwDotsOverlay"><div class="pw-dot"></div><div class="pw-dot"></div><div class="pw-dot"></div><div class="pw-dot"></div></div><div class="pw-numpad"><button class="pw-key" onclick="pwKeyPress('1')">1</button><button class="pw-key" onclick="pwKeyPress('2')">2</button><button class="pw-key" onclick="pwKeyPress('3')">3</button><button class="pw-key" onclick="pwKeyPress('4')">4</button><button class="pw-key" onclick="pwKeyPress('5')">5</button><button class="pw-key" onclick="pwKeyPress('6')">6</button><button class="pw-key" onclick="pwKeyPress('7')">7</button><button class="pw-key" onclick="pwKeyPress('8')">8</button><button class="pw-key" onclick="pwKeyPress('9')">9</button><button class="pw-key empty"></button><button class="pw-key" onclick="pwKeyPress('0')">0</button><button class="pw-key" onclick="pwKeyPress('del')" style="font-size:16px;">⌫</button></div></div></div>
   <div class="header">
     <div class="header-content">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
@@ -274,7 +278,7 @@ function showStamp(cb) {
 }
 
 function switchTab(tab) {
-  if(tab==="members"&&!adminUnlocked) pwInput="";
+  
   currentTab=tab;
   document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
   ["coupon","guest","ranking","history","badges","notices","members"].forEach(t=>document.getElementById("tab-"+t).classList.toggle("hidden",t!==tab));
@@ -474,6 +478,8 @@ function lockAdmin(){adminUnlocked=false;pwInput="";render();}
 
 // ===== RENDER =====
 function render() {
+  var pwOv=document.getElementById("pwOverlay");
+  if(pwOv){ if(adminUnlocked) pwOv.classList.add("hidden"); else { pwOv.classList.remove("hidden"); return; } }
   const members=activeMembers();
   const todayCnt=data.history.filter(h=>h.date===today()&&(h.type==="use"||h.type==="guest"||h.type==="companion")).length;
   const sub=document.getElementById("headerSub");
@@ -709,7 +715,7 @@ const BADGE_PRESET_IMAGES = {
 function getBadgeImg(b) {
   if(b.presetKey && BADGE_PRESET_IMAGES[b.presetKey]) return BADGE_PRESET_IMAGES[b.presetKey];
   if(b.imageData) return b.imageData;
-  return null;
+  return findBadgeImage(b.name);
 }
 
 function addBadgeDef() {
@@ -1026,10 +1032,6 @@ function renderNotices(){
 
 function renderMembers() {
   const el=document.getElementById("tab-members"); if(!el)return;
-  if(!adminUnlocked){
-    el.innerHTML='<div class="pw-screen"><div style="font-size:56px;">🔒</div><div style="font-size:16px;font-weight:700;color:#0f172a;">관리자 비밀번호 입력</div><div style="font-size:13px;color:#94a3b8;">회원 관리는 관리자만 접근할 수 있습니다</div><div class="pw-dots"><div class="pw-dot"></div><div class="pw-dot"></div><div class="pw-dot"></div><div class="pw-dot"></div></div><div class="pw-numpad"><button class="pw-key" onclick="pwKeyPress(\'1\')">1</button><button class="pw-key" onclick="pwKeyPress(\'2\')">2</button><button class="pw-key" onclick="pwKeyPress(\'3\')">3</button><button class="pw-key" onclick="pwKeyPress(\'4\')">4</button><button class="pw-key" onclick="pwKeyPress(\'5\')">5</button><button class="pw-key" onclick="pwKeyPress(\'6\')">6</button><button class="pw-key" onclick="pwKeyPress(\'7\')">7</button><button class="pw-key" onclick="pwKeyPress(\'8\')">8</button><button class="pw-key" onclick="pwKeyPress(\'9\')">9</button><button class="pw-key empty"></button><button class="pw-key" onclick="pwKeyPress(\'0\')">0</button><button class="pw-key" onclick="pwKeyPress(\'del\')" style="font-size:16px;">⌫</button></div></div>';
-    return;
-  }
   const members=activeMembers();
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'
     +'<button class="btn btn-sm" style="background:#64748b;color:#fff;border:none;border-radius:8px;font-family:\'Noto Sans KR\',sans-serif;font-weight:700;cursor:pointer;" onclick="lockAdmin()">🔒 잠금</button></div>'
