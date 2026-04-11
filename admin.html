@@ -415,8 +415,22 @@ function addMember() {
   showToast(name+"님 등록 ("+amount+"장 구매)"); render();
 }
 function openEditMember(id) {
+  const affWrap = document.getElementById('editMemberAff').parentElement;
+  // 가상 ID: companion:<name> / guest:<name>
+  if (id.indexOf('companion:') === 0 || id.indexOf('guest:') === 0) {
+    const isGuest = id.indexOf('guest:') === 0;
+    const name = isGuest ? id.substring(6) : id.substring(10);
+    document.getElementById('editMemberId').value = id;
+    document.getElementById('editMemberName').value = name;
+    document.getElementById('editMemberAff').value = '';
+    affWrap.style.display = 'none';
+    document.getElementById('editMemberModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('editMemberName').focus(), 100);
+    return;
+  }
   const m = data.members.find(x => x.id === id);
   if (!m) return;
+  affWrap.style.display = '';
   document.getElementById('editMemberId').value = id;
   document.getElementById('editMemberName').value = m.name;
   document.getElementById('editMemberAff').value = m.affiliation || '';
@@ -431,6 +445,33 @@ function saveEditMember() {
   const newName = document.getElementById('editMemberName').value.trim();
   const newAff = document.getElementById('editMemberAff').value.trim();
   if (!newName) { showToast('이름을 입력해주세요', 'error'); return; }
+  // 가상 ID: companion / guest 이름 변경
+  if (id.indexOf('companion:') === 0 || id.indexOf('guest:') === 0) {
+    const isGuest = id.indexOf('guest:') === 0;
+    const type = isGuest ? 'guest' : 'companion';
+    const label = isGuest ? '현장입장' : '동반입장';
+    const oldName = isGuest ? id.substring(6) : id.substring(10);
+    if (oldName === newName) { closeEditMember(); return; }
+    data.history.forEach(h => {
+      if (h.type === type && h.memberName === oldName) {
+        h.memberName = newName;
+        h.memberId = 'guest_' + newName;
+      }
+    });
+    // 동반입장이면 사용(use) 기록의 companions 배열도 함께 갱신
+    if (type === 'companion') {
+      data.history.forEach(h => {
+        if (h.type === 'use' && h.companions && h.companions.length) {
+          h.companions = h.companions.map(n => n === oldName ? newName : n);
+        }
+      });
+    }
+    syncToFirebase();
+    closeEditMember();
+    showToast(oldName + ' → ' + newName + ' ' + label + ' 수정 완료 ✅');
+    render();
+    return;
+  }
   const dup = data.members.find(m => m.name === newName && m.id !== id && !m.deleted);
   if (dup) { showToast('이미 사용 중인 이름입니다', 'error'); return; }
   const m = data.members.find(x => x.id === id);
@@ -448,6 +489,24 @@ function deleteMember(id) {
   const m=data.members.find(x=>x.id===id);
   if(!confirm(m.name+"님을 삭제하시겠습니까?"))return;
   m.deleted=true; syncToFirebase(); showToast(m.name+"님 삭제됨"); render();
+}
+function deleteGuestPerson(type, name) {
+  const label = type === 'guest' ? '현장입장' : '동반입장';
+  const count = data.history.filter(h => h.type === type && h.memberName === name).length;
+  if (count === 0) return;
+  if (!confirm(name + '님의 ' + label + ' 기록 ' + count + '건을 모두 삭제하시겠습니까?')) return;
+  data.history = data.history.filter(h => !(h.type === type && h.memberName === name));
+  // 동반입장이면 사용(use) 기록의 companions 배열에서도 제거
+  if (type === 'companion') {
+    data.history.forEach(h => {
+      if (h.type === 'use' && h.companions && h.companions.length) {
+        h.companions = h.companions.filter(n => n !== name);
+      }
+    });
+  }
+  syncToFirebase();
+  showToast(name + '님 ' + label + ' 기록 삭제 완료');
+  render();
 }
 
 // ===== GUEST ENTRY =====
@@ -1498,6 +1557,26 @@ function renderNotices(){
 function renderMembers() {
   const el=document.getElementById("tab-members"); if(!el)return;
   const members=activeMembers();
+
+  // 동반입장/현장입장 고유 인원 집계
+  const compMap={}, guestMap={};
+  data.history.forEach(h=>{
+    if(!h.memberName) return;
+    if(h.type==='companion'){
+      if(!compMap[h.memberName]) compMap[h.memberName]={name:h.memberName,count:0,lastDate:''};
+      compMap[h.memberName].count++;
+      const d=h.date||'';
+      if(d>compMap[h.memberName].lastDate) compMap[h.memberName].lastDate=d;
+    } else if(h.type==='guest'){
+      if(!guestMap[h.memberName]) guestMap[h.memberName]={name:h.memberName,count:0,lastDate:''};
+      guestMap[h.memberName].count++;
+      const d=h.date||'';
+      if(d>guestMap[h.memberName].lastDate) guestMap[h.memberName].lastDate=d;
+    }
+  });
+  const companionList=Object.values(compMap).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+  const guestList=Object.values(guestMap).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'
     +'<button class="btn btn-sm" style="background:#64748b;color:#fff;border:none;border-radius:8px;font-family:\'Noto Sans KR\',sans-serif;font-weight:700;cursor:pointer;" onclick="lockAdmin()">🔒 잠금</button></div>'
 
@@ -1521,30 +1600,92 @@ function renderMembers() {
     +'<button class="btn btn-primary" onclick="changePassword()" style="flex:0 0 auto;background:linear-gradient(135deg,#6366f1,#4f46e5);">변경</button>'
     +'</div>'
     +'<p style="font-size:11px;color:#94a3b8;margin-top:8px;">* 숫자 4자리 · Firebase에 저장됩니다</p>'
-    +'</div>'
+    +'</div>';
 
-    +'<p style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;">📋 회원 목록 ('+members.length+'명)</p>';
+  // 🎫 티켓참여자
+  html+='<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px;padding:8px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;">'
+    +'<span style="font-size:16px;">🎫</span>'
+    +'<span style="font-size:14px;font-weight:800;color:#059669;flex:1;">티켓참여자</span>'
+    +'<span style="font-size:11px;font-weight:700;color:#059669;background:#fff;padding:2px 9px;border-radius:10px;border:1px solid #a7f3d0;">'+members.length+'명</span>'
+    +'</div>';
+  if(members.length===0){
+    html+='<div style="padding:18px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border:1px dashed #e2e8f0;border-radius:10px;margin-bottom:10px;">등록된 티켓참여자가 없습니다</div>';
+  } else {
+    html+=members.map(m=>{
+      const totalUsed=m.totalBought-m.remaining;
+      return '<div class="card" style="margin-bottom:8px;padding:14px;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        +'<div><span style="font-weight:700;font-size:15px;color:#0f172a;">'+m.name+'</span>'+(m.affiliation?'<span style="font-size:12px;color:#94a3b8;margin-left:6px;">('+m.affiliation+')</span>':'')+'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="btn btn-sm" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;cursor:pointer;" onclick="openEditMember(\''+m.id+'\')">✏️ 수정</button>'
+        +'<button class="btn btn-sm btn-danger-outline" style="cursor:pointer;" onclick="deleteMember(\''+m.id+'\')">삭제</button>'
+        +'</div>'
+        +'</div>'
+        +'<div style="font-size:12px;color:#64748b;margin-bottom:8px;">총 구매 <strong>'+m.totalBought+'</strong>장 · 사용 <strong>'+totalUsed+'</strong>장 · 잔여 <strong style="color:'+(m.remaining<=3?'#ef4444':'#059669')+'">'+m.remaining+'장</strong></div>'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
+        +'<span style="font-size:11px;color:#64748b;font-weight:600;">빠른 추가:</span>'
+        +[5,10,20,30,40].map(u=>'<button class="btn-buy-sm" onclick="buyCoupon(\''+m.id+'\','+u+')">'+u+'장</button>').join('')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px;">'
+        +'<input id="buyCustom_'+m.id+'" class="input" style="width:80px;padding:6px 8px;font-size:13px;" type="number" min="1" max="200" placeholder="직접입력">'
+        +'<button class="btn-buy-sm" onclick="buyCouponCustom(\''+m.id+'\')">추가</button>'
+        +'</div></div>';
+    }).join('');
+  }
 
-  html+=members.map(m=>{
-    const totalUsed=m.totalBought-m.remaining;
-    return '<div class="card" style="margin-bottom:8px;padding:14px;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      +'<div><span style="font-weight:700;font-size:15px;color:#0f172a;">'+m.name+'</span>'+(m.affiliation?'<span style="font-size:12px;color:#94a3b8;margin-left:6px;">('+m.affiliation+')</span>':'')+'</div>'
-      +'<div style="display:flex;gap:6px;">'
-      +'<button class="btn btn-sm" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;cursor:pointer;" onclick="openEditMember(\''+m.id+'\')">✏️ 수정</button>'
-      +'<button class="btn btn-sm btn-danger-outline" style="cursor:pointer;" onclick="deleteMember(\''+m.id+'\')">삭제</button>'
-      +'</div>'
-      +'</div>'
-      +'<div style="font-size:12px;color:#64748b;margin-bottom:8px;">총 구매 <strong>'+m.totalBought+'</strong>장 · 사용 <strong>'+totalUsed+'</strong>장 · 잔여 <strong style="color:'+(m.remaining<=3?'#ef4444':'#059669')+'">'+m.remaining+'장</strong></div>'
-      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
-      +'<span style="font-size:11px;color:#64748b;font-weight:600;">빠른 추가:</span>'
-      +[5,10,20,30,40].map(u=>'<button class="btn-buy-sm" onclick="buyCoupon(\''+m.id+'\','+u+')">'+u+'장</button>').join('')
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:6px;">'
-      +'<input id="buyCustom_'+m.id+'" class="input" style="width:80px;padding:6px 8px;font-size:13px;" type="number" min="1" max="200" placeholder="직접입력">'
-      +'<button class="btn-buy-sm" onclick="buyCouponCustom(\''+m.id+'\')">추가</button>'
-      +'</div></div>';
-  }).join('');
+  // 💜 동반입장
+  html+='<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px;padding:8px 12px;border-radius:10px;background:#fdf4ff;border:1px solid #e9d5ff;">'
+    +'<span style="font-size:16px;">💜</span>'
+    +'<span style="font-size:14px;font-weight:800;color:#9333ea;flex:1;">동반입장</span>'
+    +'<span style="font-size:11px;font-weight:700;color:#9333ea;background:#fff;padding:2px 9px;border-radius:10px;border:1px solid #e9d5ff;">'+companionList.length+'명</span>'
+    +'</div>';
+  if(companionList.length===0){
+    html+='<div style="padding:18px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border:1px dashed #e2e8f0;border-radius:10px;margin-bottom:10px;">동반입장 기록이 없습니다</div>';
+  } else {
+    html+=companionList.map(g=>{
+      const keyAttr='companion:'+g.name;
+      return '<div class="card" style="margin-bottom:8px;padding:14px;border-color:#e9d5ff;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span style="font-size:18px;">💜</span>'
+        +'<span style="font-weight:700;font-size:15px;color:#0f172a;">'+g.name+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="btn btn-sm" data-key="'+keyAttr+'" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;cursor:pointer;" onclick="openEditMember(this.dataset.key)">✏️ 수정</button>'
+        +'<button class="btn btn-sm btn-danger-outline" data-name="'+g.name+'" style="cursor:pointer;" onclick="deleteGuestPerson(\'companion\',this.dataset.name)">삭제</button>'
+        +'</div>'
+        +'</div>'
+        +'<div style="font-size:12px;color:#64748b;">동반입장 <strong style="color:#9333ea;">'+g.count+'회</strong>'+(g.lastDate?' · 최근 '+g.lastDate:'')+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  // 🟠 현장입장
+  html+='<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px;padding:8px 12px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;">'
+    +'<span style="font-size:16px;">🟠</span>'
+    +'<span style="font-size:14px;font-weight:800;color:#ea580c;flex:1;">현장입장</span>'
+    +'<span style="font-size:11px;font-weight:700;color:#ea580c;background:#fff;padding:2px 9px;border-radius:10px;border:1px solid #fed7aa;">'+guestList.length+'명</span>'
+    +'</div>';
+  if(guestList.length===0){
+    html+='<div style="padding:18px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border:1px dashed #e2e8f0;border-radius:10px;margin-bottom:10px;">현장입장 기록이 없습니다</div>';
+  } else {
+    html+=guestList.map(g=>{
+      const keyAttr='guest:'+g.name;
+      return '<div class="card" style="margin-bottom:8px;padding:14px;border-color:#fed7aa;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span style="font-size:18px;">🟠</span>'
+        +'<span style="font-weight:700;font-size:15px;color:#0f172a;">'+g.name+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="btn btn-sm" data-key="'+keyAttr+'" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;cursor:pointer;" onclick="openEditMember(this.dataset.key)">✏️ 수정</button>'
+        +'<button class="btn btn-sm btn-danger-outline" data-name="'+g.name+'" style="cursor:pointer;" onclick="deleteGuestPerson(\'guest\',this.dataset.name)">삭제</button>'
+        +'</div>'
+        +'</div>'
+        +'<div style="font-size:12px;color:#64748b;">현장입장 <strong style="color:#ea580c;">'+g.count+'회</strong>'+(g.lastDate?' · 최근 '+g.lastDate:'')+'</div>'
+        +'</div>';
+    }).join('');
+  }
 
   el.innerHTML=html;
 }
