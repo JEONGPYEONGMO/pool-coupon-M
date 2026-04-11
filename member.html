@@ -294,11 +294,12 @@ function renderLoginList(){
     html+=`<div class="login-section-label">💜 동반입장 (${companionList.length})</div>`;
     html+=companionList.map(g=>{
       const key='companion:'+g.name;
+      const aw=data.awarded.filter(a=>a.memberId==='guest:'+g.name).length;
       return `<button class="member-login-btn" data-key="${esc(key)}" onclick="login(this.dataset.key)">
         <div class="login-avatar" style="background:#fdf4ff;border:2.5px solid #e9d5ff;color:#9333ea;font-size:20px;">💜</div>
         <div style="flex:1;">
           <div style="font-size:16px;font-weight:700;color:#fff;">${esc(g.name)}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.72);margin-top:2px;">동반입장 ${g.count}회</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.72);margin-top:2px;">동반입장 ${g.count}회${aw>0?' · 🏅'+aw+'개':''}</div>
         </div>
         <span style="color:rgba(255,255,255,0.45);font-size:20px;margin-left:auto;">›</span>
       </button>`;
@@ -310,11 +311,12 @@ function renderLoginList(){
     html+=`<div class="login-section-label">🟠 현장입장 (${guestList.length})</div>`;
     html+=guestList.map(g=>{
       const key='guest:'+g.name;
+      const aw=data.awarded.filter(a=>a.memberId==='guest:'+g.name).length;
       return `<button class="member-login-btn" data-key="${esc(key)}" onclick="login(this.dataset.key)">
         <div class="login-avatar" style="background:#fff7ed;border:2.5px solid #fed7aa;color:#ea580c;font-size:20px;">🟠</div>
         <div style="flex:1;">
           <div style="font-size:16px;font-weight:700;color:#fff;">${esc(g.name)}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.72);margin-top:2px;">현장입장 ${g.count}회</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.72);margin-top:2px;">현장입장 ${g.count}회${aw>0?' · 🏅'+aw+'개':''}</div>
         </div>
         <span style="color:rgba(255,255,255,0.45);font-size:20px;margin-left:auto;">›</span>
       </button>`;
@@ -344,8 +346,9 @@ function updateHeader(){
     const type=isGuest?'guest':'companion';
     const label=isGuest?'현장입장':'동반입장';
     const count=data.history.filter(h=>h.type===type && h.memberName===name).length;
+    const aw=data.awarded.filter(a=>a.memberId==='guest:'+name).length;
     document.getElementById('headerName').textContent=name+'님';
-    document.getElementById('headerSub').textContent=`${label} · 누적 ${count}회`;
+    document.getElementById('headerSub').textContent=`${label} · 누적 ${count}회 · 배지 ${aw}개`;
     return;
   }
   const m=activeMembers().find(x=>x.id===selectedMemberId); if(!m) return;
@@ -512,6 +515,12 @@ function renderGuestInfo(){
     .sort((a,b)=>(b.timestamp||'').localeCompare(a.timestamp||''));
   const monthCount=monthHistory.length;
 
+  // 배지: admin은 비회원에게 'guest:'+이름 키로 저장 (동반/현장 구분 없이)
+  const awardKey='guest:'+name;
+  const myAwarded=data.awarded.filter(a=>a.memberId===awardKey);
+  const earnedIds=new Set(myAwarded.map(a=>a.badgeId));
+  const notEarned=data.badges.filter(b=>!earnedIds.has(b.id));
+
   let html=`
   <div class="profile-card" style="border-color:${border};">
     <div class="big-ring" style="background:${bg};border:4px solid ${border};">
@@ -522,7 +531,7 @@ function renderGuestInfo(){
     <div style="font-size:12px;color:#94a3b8;margin-top:10px;">누적 ${totalCount}회 참여</div>
   </div>
 
-  <div class="stats-row" style="grid-template-columns:1fr 1fr;">
+  <div class="stats-row">
     <div class="stat-box" style="background:${bg};border:1px solid ${border};">
       <div class="stat-num" style="color:${color};">${totalCount}</div>
       <div class="stat-label" style="color:${color};">총 ${typeLabel}</div>
@@ -531,7 +540,49 @@ function renderGuestInfo(){
       <div class="stat-num" style="color:#2563eb;">${monthCount}</div>
       <div class="stat-label" style="color:#2563eb;">이번 달</div>
     </div>
+    <div class="stat-box" style="background:#fef3c7;border:1px solid #fcd34d;">
+      <div class="stat-num" style="color:#d97706;">${myAwarded.length}</div>
+      <div class="stat-label" style="color:#d97706;">배지</div>
+    </div>
   </div>
+
+  <!-- 배지 섹션 -->
+  <div class="card" style="border-color:#f59e0b;border-width:2px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;color:#0f172a;">🏅 나의 배지</div>
+      <span style="padding:3px 10px;border-radius:20px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;">${myAwarded.length}개 획득 / 전체 ${data.badges.length}개</span>
+    </div>`;
+
+  if(myAwarded.length>0){
+    html+=`<div class="badge-grid">`;
+    myAwarded.forEach(a=>{
+      const b=data.badges.find(x=>x.id===a.badgeId);
+      const img=b?getBadgeImg(b):null;
+      html+=`<div class="badge-item earned">
+        ${img?`<img src="${img}" class="badge-img">`:`<span class="badge-emoji">🏅</span>`}
+        <div class="badge-name">${esc(a.badgeName)}</div>
+        <div class="badge-date">🗓 ${a.awardedAt}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  } else {
+    html+=`<div style="text-align:center;padding:18px 0;color:#94a3b8;font-size:13px;">아직 획득한 배지가 없습니다</div>`;
+  }
+
+  if(notEarned.length>0){
+    html+=`<div style="font-size:12px;font-weight:700;color:#94a3b8;margin:10px 0 8px;">미획득 배지</div><div class="badge-grid">`;
+    notEarned.forEach(b=>{
+      const img=getBadgeImg(b);
+      html+=`<div class="badge-item not-earned">
+        ${img?`<img src="${img}" class="badge-img">`:`<span class="badge-emoji">🏅</span>`}
+        <div class="badge-name">${esc(b.name)}</div>
+        ${b.desc?`<div class="badge-desc">${esc(b.desc)}</div>`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  html+=`</div>
 
   <div class="card">
     <div class="month-nav">
