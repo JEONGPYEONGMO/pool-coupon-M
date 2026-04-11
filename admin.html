@@ -116,6 +116,26 @@
 <div id="alertModal" class="overlay hidden"></div>
 <div id="useModal" class="overlay hidden"></div>
 
+<!-- 회원 이름 수정 모달 -->
+<div id="editMemberModal" class="overlay hidden">
+  <div class="use-modal" style="width:min(92vw,400px);">
+    <div class="use-modal-title">✏️ 회원 정보 수정</div>
+    <input type="hidden" id="editMemberId">
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:4px;">이름 *</label>
+      <input id="editMemberName" class="input" style="width:100%;" placeholder="이름 입력" onkeydown="if(event.key==='Enter')saveEditMember()">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:4px;">소속</label>
+      <input id="editMemberAff" class="input" style="width:100%;" placeholder="소속 입력 (선택)" onkeydown="if(event.key==='Enter')saveEditMember()">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" style="flex:1;background:#f1f5f9;color:#64748b;" onclick="closeEditMember()">취소</button>
+      <button class="btn btn-primary" style="flex:2;" onclick="saveEditMember()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 공지 수정 모달 -->
 <div id="editNtcModal" class="overlay hidden">
   <div class="use-modal" style="width:min(92vw,460px);">
@@ -388,6 +408,36 @@ function addMember() {
   syncToFirebase(); nameEl.value=""; affEl.value=""; amtEl.value="";
   showToast(name+"님 등록 ("+amount+"장 구매)"); render();
 }
+function openEditMember(id) {
+  const m = data.members.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('editMemberId').value = id;
+  document.getElementById('editMemberName').value = m.name;
+  document.getElementById('editMemberAff').value = m.affiliation || '';
+  document.getElementById('editMemberModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('editMemberName').focus(), 100);
+}
+function closeEditMember() {
+  document.getElementById('editMemberModal').classList.add('hidden');
+}
+function saveEditMember() {
+  const id = document.getElementById('editMemberId').value;
+  const newName = document.getElementById('editMemberName').value.trim();
+  const newAff = document.getElementById('editMemberAff').value.trim();
+  if (!newName) { showToast('이름을 입력해주세요', 'error'); return; }
+  const dup = data.members.find(m => m.name === newName && m.id !== id && !m.deleted);
+  if (dup) { showToast('이미 사용 중인 이름입니다', 'error'); return; }
+  const m = data.members.find(x => x.id === id);
+  if (!m) return;
+  const oldName = m.name;
+  m.name = newName;
+  m.affiliation = newAff;
+  data.history.forEach(h => { if (h.memberId === id) h.memberName = newName; });
+  syncToFirebase();
+  closeEditMember();
+  showToast(oldName + ' → ' + newName + ' 수정 완료 ✅');
+  render();
+}
 function deleteMember(id) {
   const m=data.members.find(x=>x.id===id);
   if(!confirm(m.name+"님을 삭제하시겠습니까?"))return;
@@ -484,7 +534,9 @@ function render() {
   const todayCnt=data.history.filter(h=>h.date===today()&&(h.type==="use"||h.type==="guest"||h.type==="companion")).length;
   const sub=document.getElementById("headerSub");
   if(sub) sub.innerHTML=today()+" · 오늘 참석: <strong>"+todayCnt+"명</strong> · 등록 회원: <strong>"+members.length+"명</strong>";
-  renderCoupon(); renderGuest(); renderRanking(); renderHistory(); renderBadges(); renderNotices(); renderMembers();
+  [renderCoupon, renderGuest, renderRanking, renderHistory, renderBadges, renderNotices, renderMembers].forEach(fn => {
+    try { fn(); } catch(e) { console.error('[render error]', fn.name, e); }
+  });
 }
 
 function getRingColor(m) {
@@ -715,7 +767,7 @@ const BADGE_PRESET_IMAGES = {
 function getBadgeImg(b) {
   if(b.presetKey && BADGE_PRESET_IMAGES[b.presetKey]) return BADGE_PRESET_IMAGES[b.presetKey];
   if(b.imageData) return b.imageData;
-  return findBadgeImage(b.name);
+  return null;
 }
 
 function addBadgeDef() {
@@ -747,6 +799,46 @@ function addBadgeDef() {
   }
 }
 
+
+// ===== 배지 초기화 / 이미지 업데이트 =====
+const DEFAULT_BADGES = [
+  { key: 'badge_5',  name: '기부 5만원',  desc: '5만원 이상 기부' },
+  { key: 'badge_10', name: '기부 10만원', desc: '10만원 이상 기부' },
+  { key: 'badge_30', name: '기부 30만원', desc: '30만원 이상 기부' },
+];
+
+function initBadges() {
+  if(!confirm('현재 배지를 모두 삭제하고 기본 배지 3개로 초기화하시겠습니까?\n(부여된 배지 기록도 삭제됩니다)')) return;
+  const now = new Date().toISOString();
+  data.badges = DEFAULT_BADGES.map(b => ({
+    id: 'bdg_' + uid(),
+    name: b.name,
+    desc: b.desc,
+    presetKey: b.key,
+    imageData: BADGE_PRESET_IMAGES[b.key] || null,
+    createdAt: now
+  }));
+  data.awarded = [];
+  syncToFirebase();
+  showToast('배지 초기화 완료 🏅 (' + data.badges.length + '개)');
+  render();
+}
+
+function syncBadgeImages() {
+  if(!db) { showToast('Firebase 연결 안됨', 'error'); return; }
+  let updated = 0;
+  data.badges.forEach(b => {
+    if(b.presetKey && BADGE_PRESET_IMAGES[b.presetKey]) {
+      b.imageData = BADGE_PRESET_IMAGES[b.presetKey];
+      updated++;
+    }
+  });
+  if(updated === 0) { showToast('업데이트할 배지 이미지 없음', 'error'); return; }
+  syncToFirebase();
+  showToast('배지 이미지 DB 업데이트 완료 (' + updated + '개) ✅');
+  render();
+}
+
 function deleteBadgeDef(id) {
   if(!confirm('이 배지를 삭제하시겠습니까?\n(부여된 기록도 삭제됩니다)')) return;
   data.badges = data.badges.filter(b=>b.id!==id);
@@ -756,15 +848,25 @@ function deleteBadgeDef(id) {
 
 function openAwardModal(badgeId) {
   const b = data.badges.find(x=>x.id===badgeId); if(!b) return;
-  const members = activeMembers();
-  const imgTag = getBadgeImg(b) ? `<img src="${getBadgeImg(b)}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px;">` : `<div style="font-size:56px;margin-bottom:12px;">🏅</div>`;
-  const opts = members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  // 랭킹에 있는 모든 사람 (쿠폰회원 + 현장입장 + 동반참석)
+  const ranking = buildRanking();
+  const memberMap = {};
+  activeMembers().forEach(m => { memberMap[m.name] = m.id; });
+  const imgTag = getBadgeImg(b)
+    ? `<img src="${getBadgeImg(b)}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px;">`
+    : `<div style="font-size:56px;margin-bottom:12px;">🏅</div>`;
+  // 랭킹 전원을 옵션으로 - 등록회원은 id, 비회원은 'guest:이름' 형태
+  const opts = ranking.map(r => {
+    const mid = memberMap[r.name] ? memberMap[r.name] : 'guest:' + r.name;
+    const label = memberMap[r.name] ? r.name : r.name + ' (비회원)';
+    return `<option value="${mid}">${label} · ${r.count}회 참여</option>`;
+  }).join('');
   const el = document.getElementById('useModal'); el.className='overlay';
   el.innerHTML = `<div class="use-modal">
     <div style="text-align:center;">${imgTag}</div>
     <div class="use-modal-title">🏅 배지 부여 — ${b.name}</div>
     <div style="margin-bottom:12px;">
-      <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:4px;">회원 선택</label>
+      <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:4px;">참여자 선택 (랭킹 전원)</label>
       <select id="awardMember" class="select" style="width:100%;">${opts}</select>
     </div>
     <div style="margin-bottom:16px;">
@@ -781,14 +883,22 @@ function openAwardModal(badgeId) {
 function confirmAward(badgeId) {
   const memberId = document.getElementById('awardMember').value;
   const awardedAt = document.getElementById('awardDate').value;
-  const m = data.members.find(x=>x.id===memberId); if(!m) return;
   const b = data.badges.find(x=>x.id===badgeId); if(!b) return;
+  // 등록회원 vs 비회원 구분
+  let memberName;
+  if(memberId.startsWith('guest:')) {
+    memberName = memberId.slice(6); // 'guest:이름' → '이름'
+  } else {
+    const m = data.members.find(x=>x.id===memberId);
+    if(!m) return;
+    memberName = m.name;
+  }
   // 중복 체크
   if(data.awarded.some(a=>a.badgeId===badgeId&&a.memberId===memberId)) {
     showToast('이미 부여된 배지입니다','error'); return;
   }
-  data.awarded.push({id:'aw_'+uid(), memberId, memberName:m.name, badgeId, badgeName:b.name, awardedAt});
-  syncToFirebase(); closeUseModal(); showToast(`${m.name}님에게 '${b.name}' 배지 부여! 🏅`); render();
+  data.awarded.push({id:'aw_'+uid(), memberId, memberName, badgeId, badgeName:b.name, awardedAt});
+  syncToFirebase(); closeUseModal(); showToast(`${memberName}님에게 '${b.name}' 배지 부여! 🏅`); render();
 }
 
 function revokeAward(awardId) {
@@ -802,7 +912,13 @@ function renderBadges() {
   const badges = data.badges;
   let html = `
   <div class="card" style="border-color:#f59e0b;border-width:2px;margin-bottom:16px;">
-    <p style="font-weight:800;font-size:15px;color:#92400e;margin-bottom:14px;">🏅 배지 목록 (${badges.length}개)</p>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <p style="font-weight:800;font-size:15px;color:#92400e;margin:0;">🏅 배지 목록 (${badges.length}개)</p>
+      <div style="display:flex;gap:6px;">
+        <button onclick="syncBadgeImages()" style="padding:6px 10px;border-radius:8px;background:#dcfce7;color:#166534;border:1.5px solid #86efac;font-size:12px;font-weight:700;cursor:pointer;">🖼 이미지 DB 업데이트</button>
+        <button onclick="initBadges()" style="padding:6px 10px;border-radius:8px;background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;font-size:12px;font-weight:700;cursor:pointer;">🔄 배지 초기화</button>
+      </div>
+    </div>`;
   
   if(badges.length===0) {
     html += '<div class="empty-state"><div style="font-size:48px;margin-bottom:12px;">🏅</div><p>아직 배지가 없습니다</p></div>';
@@ -1065,7 +1181,10 @@ function renderMembers() {
     return '<div class="card" style="margin-bottom:8px;padding:14px;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
       +'<div><span style="font-weight:700;font-size:15px;color:#0f172a;">'+m.name+'</span>'+(m.affiliation?'<span style="font-size:12px;color:#94a3b8;margin-left:6px;">('+m.affiliation+')</span>':'')+'</div>'
-      +'<button class="btn btn-sm btn-danger-outline" style="font-family:\'Noto Sans KR\',sans-serif;cursor:pointer;" onclick="deleteMember(\''+m.id+'\')">삭제</button>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<button class="btn btn-sm" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;cursor:pointer;" onclick="openEditMember(\''+m.id+'\')">✏️ 수정</button>'
+      +'<button class="btn btn-sm btn-danger-outline" style="cursor:pointer;" onclick="deleteMember(\''+m.id+'\')">삭제</button>'
+      +'</div>'
       +'</div>'
       +'<div style="font-size:12px;color:#64748b;margin-bottom:8px;">총 구매 <strong>'+m.totalBought+'</strong>장 · 사용 <strong>'+totalUsed+'</strong>장 · 잔여 <strong style="color:'+(m.remaining<=3?'#ef4444':'#059669')+'">'+m.remaining+'장</strong></div>'
       +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
