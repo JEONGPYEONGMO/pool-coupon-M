@@ -1,0 +1,16 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "members": {
+      "$mid": {
+        ".validate": "newData.hasChildren(['id', 'name'])"
+      }
+    },
+    "schedules": {
+      "$sid": {
+        ".validate": "newData.hasChildren(['id', 'memberId', 'type', 'startDate', 'endDate']) && (newData.child('type').val() === 'trip' || newData.child('type').val() === 'vacation')"
+      }
+    }
+  }
+}

@@ -1,54 +1,1008 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 수영장 쿠폰 시스템</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body {
-    font-family:'Noto Sans KR',sans-serif; min-height:100vh;
-    background:linear-gradient(135deg,#0e7490 0%,#059669 50%,#10b981 100%);
-    display:flex; align-items:center; justify-content:center; padding:20px;
-  }
-  .container { max-width:400px; width:100%; text-align:center; }
-  .logo { font-size:64px; margin-bottom:16px; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
-  h1 { font-family:'Outfit',sans-serif; font-size:28px; font-weight:800; color:#fff; margin-bottom:8px; }
-  .sub { font-size:14px; color:rgba(255,255,255,0.8); margin-bottom:40px; }
-  .card {
-    display:block; padding:24px; border-radius:18px; background:rgba(255,255,255,0.95);
-    text-decoration:none; margin-bottom:16px; transition:all 0.2s;
-    box-shadow:0 8px 30px rgba(0,0,0,0.15);
-  }
-  .card:active { transform:scale(0.97); }
-  .card-icon { font-size:40px; margin-bottom:8px; }
-  .card-title { font-size:18px; font-weight:800; margin-bottom:4px; }
-  .card-desc { font-size:13px; color:#64748b; }
-  .card-admin .card-title { color:#0e7490; }
-  .card-member .card-title { color:#059669; }
-  .footer { margin-top:30px; font-size:11px; color:rgba(255,255,255,0.5); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0E1A2B" />
+  <meta name="description" content="RX Inc. 회사 출장·휴가 현황 보드" />
+
+  <!-- PWA / iOS -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="RX팀보드" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <title>RX 회사 현황</title>
+
+  <!-- Pretendard -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 UMD -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel standalone (JSX → JS in browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase SDK (compat, so we can use from classic script) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+  <style>
+    html, body {
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: contain;
+      background: #F7F6F2;
+    }
+    body { margin: 0; }
+    /* Loading splash */
+    #splash {
+      position: fixed; inset: 0; background: #0E1A2B; color: #F7F6F2;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px; z-index: 9999;
+    }
+    #splash .logo { font-weight: 800; font-size: 28px; letter-spacing: 0.1em; }
+    #splash .dot { color: #D9542B; }
+    #splash .sub { font-size: 12px; opacity: 0.6; letter-spacing: 0.15em; }
+    .fade-out { opacity: 0; transition: opacity 300ms; pointer-events: none; }
+    /* Hide native date-picker arrow cleanliness */
+    input[type="date"] { min-height: 44px; }
+    /* iOS safe area for FAB */
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
 </head>
 <body>
-<div class="container">
-  <div class="logo">🏊‍♂️</div>
-  <h1>수영장 쿠폰</h1>
-  <p class="sub">쿠폰 관리 · 실시간 조회</p>
-  
-  <a href="/admin.html" class="card card-admin">
-    <div class="card-icon">🎫</div>
-    <div class="card-title">관리자</div>
-    <div class="card-desc">쿠폰 사용 처리 · 회원 관리 · 내역 조회</div>
-  </a>
-  
-  <a href="/member.html" class="card card-member">
-    <div class="card-icon">🏊</div>
-    <div class="card-title">회원 조회</div>
-    <div class="card-desc">내 쿠폰 잔여 확인 · 사용 내역 보기</div>
-  </a>
-  
-  <div class="footer">Firebase 실시간 연동 · PWA 지원</div>
-</div>
+  <!-- Splash -->
+  <div id="splash">
+    <div class="logo">RX<span class="dot">·</span>TEAM</div>
+    <div class="sub">LOADING</div>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- Firebase Init -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyALoJTOi18FdPCJnhVL4jQ3E9Fvmvqv6EM",
+      authDomain: "rx-team-board.firebaseapp.com",
+      databaseURL: "https://rx-team-board-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "rx-team-board",
+      storageBucket: "rx-team-board.firebasestorage.app",
+      messagingSenderId: "107487701785",
+      appId: "1:107487701785:web:16f092004a81c7e5ed3388",
+      measurementId: "G-GCN5D3TN69"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.auth().signInAnonymously().catch((e) => {
+      console.warn('Anonymous auth skipped:', e.code);
+    });
+  </script>
+
+  <!-- App -->
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useMemo } = React;
+    const db = firebase.database();
+
+    /* ============================================================
+       Constants & Colors
+    ============================================================ */
+    const C = {
+      bg: "#F7F6F2", ink: "#0E1A2B", sub: "#5B6472",
+      line: "#E7E4DB", card: "#FFFFFF",
+    };
+
+    /* DB 버전: 변경 시 Firebase 멤버 목록 자동 동기화 */
+    const APP_VERSION = "v2.1";
+
+    const DEFAULT_MEMBERS = [
+      { id: "m1",  name: "이강헌", rank: "대표" },
+      { id: "m2",  name: "이성기", rank: "이사" },
+      { id: "m3",  name: "황정하", rank: "이사" },
+      { id: "m4",  name: "김병훈", rank: "팀장" },
+      { id: "m5",  name: "이소윤", rank: "팀장" },
+      { id: "m6",  name: "최순",   rank: "고문" },
+      { id: "m7",  name: "정평모", rank: "책임" },
+      { id: "m8",  name: "고동국", rank: "선임" },
+      { id: "m9",  name: "손주현", rank: "선임" },
+      { id: "m10", name: "오서진", rank: "선임" },
+      { id: "m11", name: "이대윤", rank: "선임" },
+      { id: "m12", name: "이종원", rank: "선임" },
+      { id: "m13", name: "정세진", rank: "선임" },
+      { id: "m14", name: "조재훈", rank: "선임" },
+      { id: "m15", name: "배문기", rank: "과장" },
+    ];
+
+    /* ============================================================
+       Inline Lucide-style SVG icons
+    ============================================================ */
+    const Svg = ({ size = 16, strokeWidth = 2, className, style, color, children }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+        fill="none" stroke={color || "currentColor"} strokeWidth={strokeWidth}
+        strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {children}
+      </svg>
+    );
+    const Plus = (p) => <Svg {...p}><path d="M12 5v14" /><path d="M5 12h14" /></Svg>;
+    const MapPin = (p) => <Svg {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></Svg>;
+    const Calendar = (p) => <Svg {...p}><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></Svg>;
+    const XIcon = (p) => <Svg {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Svg>;
+    const Briefcase = (p) => <Svg {...p}><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /><rect width="20" height="14" x="2" y="6" rx="2" /></Svg>;
+    const Palmtree = (p) => <Svg {...p}><path d="M13 8c0-2.76-2.46-5-5.5-5S2 5.24 2 8h2l1-1 1 1h4" /><path d="M13 7.14A5.82 5.82 0 0 1 16.5 6c3.04 0 5.5 2.24 5.5 5h-3l-1-1-1 1h-3" /><path d="M5.89 9.71c-2.15 2.15-2.3 5.47-.35 7.43l4.24-4.25.7-.7.71-.71 2.12-2.12c-1.95-1.96-5.27-1.8-7.42.35z" /><path d="M11 15.5c.5 2.5-.17 4.5-1 6.5h4c2-5.5-.5-12-1-14" /></Svg>;
+    const Building2 = (p) => <Svg {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></Svg>;
+    const Users = (p) => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Svg>;
+    const Settings = (p) => <Svg {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Svg>;
+    const Trash2 = (p) => <Svg {...p}><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></Svg>;
+    const Check = (p) => <Svg {...p}><path d="M20 6 9 17l-5-5" /></Svg>;
+    const ChevronRight = (p) => <Svg {...p}><path d="m9 18 6-6-6-6" /></Svg>;
+    const ChevronLeft = (p) => <Svg {...p}><path d="m15 18-6-6 6-6" /></Svg>;
+    const AlertCircle = (p) => <Svg {...p}><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12" y1="16" y2="16.01" /></Svg>;
+    const ArrowRight = (p) => <Svg {...p}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></Svg>;
+
+    /* ============================================================
+       Status system
+    ============================================================ */
+    const STATUS = {
+      office:   { key: "office",   label: "출근", main: "#10B981", soft: "#D1FAE5", softBg: "#ECFDF5", text: "#047857", icon: Building2 },
+      trip:     { key: "trip",     label: "출장", main: "#D9542B", soft: "#FFE0D1", softBg: "#FFF3EC", text: "#9A3A1B", icon: Briefcase },
+      vacation: { key: "vacation", label: "휴가", main: "#6366F1", soft: "#E0E7FF", softBg: "#EEF2FF", text: "#4338CA", icon: Palmtree },
+    };
+
+    /* ============================================================
+       Rank circle colors
+    ============================================================ */
+    const RANK_BG = {
+      "대표": "#0E1A2B",
+      "이사": "#1D4ED8",
+      "팀장": "#D9542B",
+      "고문": "#78716C",
+      "책임": "#7C3AED",
+      "선임": "#059669",
+      "과장": "#B45309",
+    };
+
+    /* ============================================================
+       Date utils
+    ============================================================ */
+    const today = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    };
+    const fmtMD = (s) => { if (!s) return ""; const [,m,d] = s.split("-"); return `${Number(m)}/${Number(d)}`; };
+    const fmtFull = (s) => {
+      if (!s) return "";
+      const [y,m,d] = s.split("-");
+      const dow = ["일","월","화","수","목","금","토"][new Date(s).getDay()];
+      return `${y}.${m}.${d} (${dow})`;
+    };
+    const dDelta = (s) => Math.round((new Date(s) - new Date(today())) / 86400000);
+    const inRange = (d, start, end) => d >= start && d <= end;
+    const uid = (p="s") => `${p}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+
+    /* ============================================================
+       Firebase helpers
+    ============================================================ */
+    const membersRef = db.ref("members");
+    const schedulesRef = db.ref("schedules");
+
+    async function syncMembers() {
+      const snap = await db.ref("meta/version").once("value");
+      if (snap.val() !== APP_VERSION) {
+        const obj = {};
+        DEFAULT_MEMBERS.forEach((m, i) => { obj[m.id] = { ...m, order: i }; });
+        await membersRef.set(obj);
+        await db.ref("meta/version").set(APP_VERSION);
+      }
+    }
+
+    /* ============================================================
+       Member status computation
+    ============================================================ */
+    function getMemberStatus(memberId, schedules) {
+      const t = today();
+      const active = schedules.find((s) => s.memberId === memberId && inRange(t, s.startDate, s.endDate));
+      if (!active) return { type: "office" };
+      return { type: active.type, schedule: active };
+    }
+
+    /* ============================================================
+       RankCircle — 직급을 동그라미 안에 표시
+    ============================================================ */
+    function RankCircle({ rank }) {
+      if (!rank) return null;
+      const bg = RANK_BG[rank] || "#6B7280";
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 22, height: 22, borderRadius: "50%",
+          background: bg, color: "#FFFFFF",
+          fontSize: 9, fontWeight: 800, letterSpacing: "-0.02em",
+          flexShrink: 0, lineHeight: 1, userSelect: "none",
+        }}>
+          {rank}
+        </span>
+      );
+    }
+
+    /* ============================================================
+       UI Bits
+    ============================================================ */
+    function StatusChip({ type, size = "sm" }) {
+      const s = STATUS[type]; const Icon = s.icon;
+      const pad = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs";
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full font-bold ${pad}`}
+          style={{ background: s.softBg, color: s.text }}>
+          <Icon size={size === "sm" ? 10 : 12} strokeWidth={2.5} />
+          {s.label}
+        </span>
+      );
+    }
+
+    function Avatar({ name, type, size = 44 }) {
+      const s = STATUS[type];
+      const initial = name ? name.trim().slice(-2) : "?";
+      return (
+        <div className="relative flex items-center justify-center rounded-full font-bold flex-shrink-0"
+          style={{ width: size, height: size, background: s.softBg, color: s.text,
+            fontSize: size*0.38, border: `2px solid ${s.main}` }}>
+          {initial}
+          {type === "trip" && (
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
+              style={{ background: s.main, borderColor: C.card }}>
+              <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    function MemberCard({ member, schedules }) {
+      const st = getMemberStatus(member.id, schedules);
+      const s = STATUS[st.type];
+      let detail = null;
+      if (st.type === "trip") {
+        detail = (
+          <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: s.text }}>
+            <MapPin size={11} strokeWidth={2.2} />
+            <span className="font-semibold">{st.schedule.destination}</span>
+            <span className="opacity-60">· ~{fmtMD(st.schedule.endDate)}</span>
+          </div>
+        );
+      } else if (st.type === "vacation") {
+        const left = dDelta(st.schedule.endDate);
+        detail = (
+          <div className="text-xs mt-0.5" style={{ color: s.text }}>
+            ~{fmtMD(st.schedule.endDate)}{left === 0 ? " (오늘 종료)" : ` · D-${left}`}
+          </div>
+        );
+      } else {
+        detail = <div className="text-xs mt-0.5" style={{ color: C.sub }}>사무실 근무</div>;
+      }
+      return (
+        <div className="flex items-center gap-3 p-3 rounded-xl border transition-all"
+          style={{ background: st.type === "office" ? C.card : s.softBg,
+            borderColor: st.type === "office" ? C.line : s.soft }}>
+          <Avatar name={member.name} type={st.type} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <RankCircle rank={member.rank} />
+              <div className="font-bold text-[15px] truncate" style={{ color: C.ink }}>{member.name}</div>
+              <StatusChip type={st.type} />
+            </div>
+            {detail}
+          </div>
+        </div>
+      );
+    }
+
+    function ScheduleRow({ schedule, member, onDelete }) {
+      const s = STATUS[schedule.type]; const Icon = s.icon;
+      const t = today();
+      const isActive = inRange(t, schedule.startDate, schedule.endDate);
+      const isPast = t > schedule.endDate;
+      const isFuture = t < schedule.startDate;
+      let hint = "";
+      if (isActive) hint = "진행중";
+      else if (isFuture) { const d = dDelta(schedule.startDate); hint = d === 0 ? "오늘부터" : `D-${d}`; }
+      else hint = "종료";
+      return (
+        <div className="p-3 rounded-xl border"
+          style={{ background: C.card, borderColor: C.line, opacity: isPast ? 0.55 : 1 }}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: s.softBg }}>
+                  <Icon size={11} style={{ color: s.main }} strokeWidth={2.5} />
+                </div>
+                {member?.rank && <RankCircle rank={member.rank} />}
+                <span className="font-bold text-sm" style={{ color: C.ink }}>{member?.name || "알 수 없음"}</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: isActive ? s.main : "#EEECE5", color: isActive ? "white" : C.sub }}>
+                  {hint}
+                </span>
+              </div>
+              {schedule.type === "trip" && (
+                <div className="mt-1.5 flex items-center gap-1 text-sm font-medium" style={{ color: C.ink }}>
+                  <MapPin size={12} strokeWidth={2.2} style={{ color: s.main }} />
+                  {schedule.destination}
+                </div>
+              )}
+              {schedule.purpose && (
+                <div className="mt-1 text-xs leading-relaxed" style={{ color: C.sub }}>{schedule.purpose}</div>
+              )}
+              <div className="mt-1.5 text-[11px] tabular-nums inline-flex items-center gap-1"
+                style={{ color: C.sub, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                <Calendar size={10} />
+                {fmtMD(schedule.startDate)} <ArrowRight size={9} /> {fmtMD(schedule.endDate)}
+              </div>
+            </div>
+            <button onClick={() => onDelete(schedule.id)} className="p-2 -m-2 rounded-lg" style={{ color: C.sub }} aria-label="삭제">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       Mini Calendar — 일정 반영 캘린더
+    ============================================================ */
+    function MiniCalendar({ schedules, members }) {
+      const now = new Date();
+      const [viewYear, setViewYear] = useState(now.getFullYear());
+      const [viewMonth, setViewMonth] = useState(now.getMonth());
+      const [selDay, setSelDay] = useState(null);
+
+      const MONTHS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+      const DOWS   = ["일","월","화","수","목","금","토"];
+
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const firstDow    = new Date(viewYear, viewMonth, 1).getDay();
+
+      const toStr = (d) =>
+        `${viewYear}-${String(viewMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+      const getDayEvts = (d) => {
+        const ds = toStr(d);
+        return schedules.filter((s) => inRange(ds, s.startDate, s.endDate));
+      };
+
+      const prevM = () => {
+        if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
+        else setViewMonth((m) => m - 1);
+        setSelDay(null);
+      };
+      const nextM = () => {
+        if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
+        else setViewMonth((m) => m + 1);
+        setSelDay(null);
+      };
+
+      const todayStr = today();
+
+      /* build cells: blanks + day numbers */
+      const cells = [
+        ...Array(firstDow).fill(null),
+        ...Array(daysInMonth).fill(null).map((_, i) => i + 1),
+      ];
+
+      return (
+        <div className="rounded-xl border mb-4" style={{ background: C.card, borderColor: C.line }}>
+          {/* Month nav */}
+          <div className="flex items-center justify-between px-3 pt-3 pb-2">
+            <button onClick={prevM}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-stone-100"
+              style={{ color: C.sub }}>
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-bold" style={{ color: C.ink }}>
+              {viewYear}년 {MONTHS[viewMonth]}
+            </span>
+            <button onClick={nextM}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-stone-100"
+              style={{ color: C.sub }}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          {/* DOW header */}
+          <div className="grid grid-cols-7 px-2 mb-1">
+            {DOWS.map((d, i) => (
+              <div key={d} className="text-center text-[10px] font-bold py-0.5"
+                style={{ color: i === 0 ? "#EF4444" : i === 6 ? "#6366F1" : C.sub }}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div className="grid grid-cols-7 gap-y-0.5 px-2 pb-2">
+            {cells.map((d, idx) => {
+              if (!d) return <div key={`b${idx}`} />;
+              const ds    = toStr(d);
+              const evts  = getDayEvts(d);
+              const isToday = ds === todayStr;
+              const isSel   = selDay === d;
+              const dow     = (firstDow + d - 1) % 7; // 0=Sun
+              const tripCnt = evts.filter((e) => e.type === "trip").length;
+              const vacCnt  = evts.filter((e) => e.type === "vacation").length;
+
+              return (
+                <button key={d}
+                  onClick={() => setSelDay(isSel ? null : d)}
+                  className="flex flex-col items-center py-1 rounded-lg transition-all"
+                  style={{
+                    background: isSel ? C.ink : isToday ? "#EEF0E8" : "transparent",
+                  }}>
+                  <span className="text-[12px] font-bold leading-tight"
+                    style={{
+                      color: isSel ? "#FFFFFF"
+                           : dow === 0 ? "#EF4444"
+                           : dow === 6 ? "#6366F1"
+                           : C.ink,
+                      textDecoration: isToday && !isSel ? "underline" : "none",
+                      textDecorationColor: C.sub,
+                    }}>
+                    {d}
+                  </span>
+                  <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                    {tripCnt > 0 && (
+                      <div className="rounded-full"
+                        style={{ width: 5, height: 5,
+                          background: isSel ? "rgba(255,255,255,0.7)" : STATUS.trip.main }} />
+                    )}
+                    {vacCnt > 0 && (
+                      <div className="rounded-full"
+                        style={{ width: 5, height: 5,
+                          background: isSel ? "rgba(255,255,255,0.7)" : STATUS.vacation.main }} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected day detail */}
+          {selDay !== null && (
+            <div className="mx-3 mb-3 pt-3 border-t" style={{ borderColor: C.line }}>
+              <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.sub }}>
+                {viewMonth + 1}월 {selDay}일 ({DOWS[(firstDow + selDay - 1) % 7]}) 일정
+              </div>
+              {getDayEvts(selDay).length === 0 ? (
+                <div className="text-xs py-1" style={{ color: C.sub }}>이 날의 일정이 없습니다</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {getDayEvts(selDay).map((s) => {
+                    const m  = members.find((mb) => mb.id === s.memberId);
+                    const st = STATUS[s.type];
+                    return (
+                      <div key={s.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                        style={{ background: st.softBg }}>
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: st.main }} />
+                        {m?.rank && <RankCircle rank={m.rank} />}
+                        <span className="text-xs font-bold" style={{ color: st.text }}>{m?.name || "?"}</span>
+                        <span className="text-[11px]" style={{ color: st.text }}>{st.label}</span>
+                        {s.destination && (
+                          <span className="text-[11px] flex items-center gap-0.5" style={{ color: st.text }}>
+                            <MapPin size={9} strokeWidth={2} /> {s.destination}
+                          </span>
+                        )}
+                        {s.purpose && !s.destination && (
+                          <span className="text-[11px] opacity-70" style={{ color: st.text }}>{s.purpose}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Legend */}
+          <div className="flex gap-3 px-3 pb-3 pt-1">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: STATUS.trip.main }} />
+              <span className="text-[9px] font-semibold" style={{ color: C.sub }}>출장</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: STATUS.vacation.main }} />
+              <span className="text-[9px] font-semibold" style={{ color: C.sub }}>휴가</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       Schedule Modal (bottom sheet)
+    ============================================================ */
+    function ScheduleModal({ open, onClose, onSave, members, destinations }) {
+      const [type, setType] = useState("trip");
+      const [memberId, setMemberId] = useState("");
+      const [startDate, setStartDate] = useState(today());
+      const [endDate, setEndDate] = useState(today());
+      const [destination, setDestination] = useState("");
+      const [purpose, setPurpose] = useState("");
+      const [err, setErr] = useState("");
+
+      useEffect(() => {
+        if (open) {
+          setType("trip");
+          setMemberId(members[0]?.id || "");
+          setStartDate(today()); setEndDate(today());
+          setDestination(""); setPurpose(""); setErr("");
+        }
+      }, [open, members]);
+
+      if (!open) return null;
+
+      const submit = () => {
+        if (!memberId) return setErr("멤버를 선택해 주세요.");
+        if (endDate < startDate) return setErr("종료일이 시작일보다 빠를 수 없습니다.");
+        if (type === "trip" && !destination.trim()) return setErr("출장지를 입력해 주세요.");
+        const rec = {
+          id: uid(), type, memberId, startDate, endDate,
+          destination: type === "trip" ? destination.trim() : "",
+          purpose: purpose.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        onSave(rec);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(14,26,43,0.45)", backdropFilter: "blur(4px)" }} onClick={onClose}>
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
+            style={{ background: C.card }} onClick={(e) => e.stopPropagation()}>
+            <div className="sm:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 rounded-full" style={{ background: C.line }} />
+            </div>
+            <div className="px-5 pt-3 pb-4 flex items-center justify-between sticky top-0 z-10" style={{ background: C.card }}>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: STATUS[type].main }}>New Schedule</div>
+                <h2 className="text-xl font-bold mt-0.5" style={{ color: C.ink }}>일정 등록</h2>
+              </div>
+              <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-stone-100" style={{ color: C.sub }}>
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="px-5 pb-5 space-y-5">
+              <div>
+                <Label>구분</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1.5">
+                  {["trip", "vacation"].map((t) => {
+                    const s = STATUS[t]; const Icon = s.icon; const active = type === t;
+                    return (
+                      <button key={t} onClick={() => setType(t)}
+                        className="flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold text-sm transition-all"
+                        style={{ background: active ? s.main : s.softBg, color: active ? "white" : s.text,
+                          boxShadow: active ? `0 4px 12px ${s.main}40` : "none" }}>
+                        <Icon size={15} strokeWidth={2.5} /> {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label>멤버 *</Label>
+                <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                  {members.map((m) => {
+                    const active = memberId === m.id;
+                    return (
+                      <button key={m.id} onClick={() => setMemberId(m.id)}
+                        className="py-2.5 px-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-between gap-1.5"
+                        style={{ background: active ? C.ink : "#F3F1EA", color: active ? "white" : C.ink }}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {m.rank && (
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              width: 18, height: 18, borderRadius: "50%",
+                              background: active ? "rgba(255,255,255,0.25)" : (RANK_BG[m.rank] || "#6B7280"),
+                              color: "white", fontSize: 7, fontWeight: 800, flexShrink: 0,
+                            }}>{m.rank}</span>
+                          )}
+                          <span className="truncate">{m.name}</span>
+                        </div>
+                        {active && <Check size={14} strokeWidth={3} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>시작일 *</Label><DateInput value={startDate} onChange={setStartDate} /></div>
+                <div><Label>종료일 *</Label><DateInput value={endDate} onChange={setEndDate} /></div>
+              </div>
+
+              {type === "trip" && (
+                <>
+                  <div>
+                    <Label>출장지 *</Label>
+                    <input className="w-full px-3.5 py-3 rounded-xl border text-[15px] mt-1.5 focus:outline-none focus:ring-2"
+                      style={{ borderColor: C.line, color: C.ink }} placeholder="예: 서울 KINS 본사"
+                      value={destination} onChange={(e) => setDestination(e.target.value)} />
+                    {destinations.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.sub }}>
+                          최근 출장지 · 탭하여 선택
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {destinations.map((d) => {
+                            const active = destination === d;
+                            return (
+                              <button key={d} onClick={() => setDestination(d)}
+                                className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
+                                style={{ background: active ? STATUS.trip.main : STATUS.trip.softBg,
+                                  color: active ? "white" : STATUS.trip.text,
+                                  borderColor: active ? STATUS.trip.main : "transparent" }}>
+                                {d}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label>출장 목적</Label>
+                    <textarea rows={2} className="w-full px-3.5 py-3 rounded-xl border text-[14px] mt-1.5 focus:outline-none focus:ring-2"
+                      style={{ borderColor: C.line, color: C.ink, resize: "vertical" }}
+                      placeholder="예: NuSSAM RTM 데모 및 KHNP 회의"
+                      value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {type === "vacation" && (
+                <div>
+                  <Label>비고</Label>
+                  <input className="w-full px-3.5 py-3 rounded-xl border text-[15px] mt-1.5 focus:outline-none focus:ring-2"
+                    style={{ borderColor: C.line, color: C.ink }} placeholder="예: 연차 / 반차 / 경조사"
+                    value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+                </div>
+              )}
+
+              {err && (
+                <div className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl"
+                  style={{ background: "#FEF2F2", color: "#B91C1C" }}>
+                  <AlertCircle size={14} /> {err}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t sticky bottom-0 flex gap-2 safe-bottom"
+              style={{ background: C.card, borderColor: C.line }}>
+              <button onClick={onClose} className="flex-1 py-3 rounded-xl text-sm font-bold"
+                style={{ background: "#F3F1EA", color: C.sub }}>취소</button>
+              <button onClick={submit} className="flex-[2] py-3 rounded-xl text-sm font-bold text-white shadow-sm"
+                style={{ background: C.ink }}>등록</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       Members Edit Modal
+    ============================================================ */
+    function MembersModal({ open, onClose, members, onSave }) {
+      const [list, setList] = useState(members);
+      useEffect(() => { if (open) setList(members); }, [open, members]);
+      if (!open) return null;
+
+      const update = (idx, name) => {
+        const next = [...list]; next[idx] = { ...next[idx], name }; setList(next);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(14,26,43,0.45)", backdropFilter: "blur(4px)" }} onClick={onClose}>
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
+            style={{ background: C.card }} onClick={(e) => e.stopPropagation()}>
+            <div className="sm:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 rounded-full" style={{ background: C.line }} />
+            </div>
+            <div className="px-5 pt-3 pb-4 flex items-center justify-between" style={{ background: C.card }}>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: C.sub }}>Team</div>
+                <h2 className="text-xl font-bold mt-0.5" style={{ color: C.ink }}>멤버 편집</h2>
+              </div>
+              <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-stone-100" style={{ color: C.sub }}>
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="px-5 pb-5 space-y-2">
+              <div className="text-xs mb-2" style={{ color: C.sub }}>
+                팀원 이름을 수정하세요. 저장 후 모든 팀원에게 즉시 반영됩니다.
+              </div>
+              {list.map((m, i) => (
+                <div key={m.id} className="flex items-center gap-2.5">
+                  {m.rank ? (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      width: 32, height: 32, borderRadius: "50%",
+                      background: RANK_BG[m.rank] || "#6B7280", color: "white",
+                      fontSize: 11, fontWeight: 800, flexShrink: 0,
+                    }}>{m.rank}</div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{ background: "#F3F1EA", color: C.sub }}>{i+1}</div>
+                  )}
+                  <input className="flex-1 px-3 py-2.5 rounded-lg border text-[15px]"
+                    style={{ borderColor: C.line, color: C.ink }} value={m.name}
+                    onChange={(e) => update(i, e.target.value)} placeholder={`멤버 ${i+1}`} />
+                </div>
+              ))}
+            </div>
+
+            <div className="px-5 py-4 border-t flex gap-2 safe-bottom"
+              style={{ borderColor: C.line, background: C.card }}>
+              <button onClick={onClose} className="flex-1 py-3 rounded-xl text-sm font-bold"
+                style={{ background: "#F3F1EA", color: C.sub }}>취소</button>
+              <button onClick={() => { onSave(list); onClose(); }}
+                className="flex-[2] py-3 rounded-xl text-sm font-bold text-white" style={{ background: C.ink }}>저장</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       Form helpers
+    ============================================================ */
+    function Label({ children }) {
+      return <label className="block text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: C.sub }}>{children}</label>;
+    }
+    function DateInput({ value, onChange }) {
+      return (
+        <input type="date" className="w-full px-3 py-3 rounded-xl border text-[15px] mt-1.5 tabular-nums focus:outline-none focus:ring-2"
+          style={{ borderColor: C.line, color: C.ink, fontFamily: "'JetBrains Mono', monospace" }}
+          value={value} onChange={(e) => onChange(e.target.value)} />
+      );
+    }
+
+    /* ============================================================
+       Main App
+    ============================================================ */
+    function App() {
+      const [members, setMembers] = useState([]);
+      const [schedules, setSchedules] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [connected, setConnected] = useState(true);
+      const [scheduleOpen, setScheduleOpen] = useState(false);
+      const [membersOpen, setMembersOpen] = useState(false);
+      const [tab, setTab] = useState("today");
+
+      // Subscribe to Firebase
+      useEffect(() => {
+        syncMembers().catch(console.error);
+
+        const mHandler = membersRef.on("value", (snap) => {
+          const val = snap.val();
+          if (!val) return;
+          const list = Object.values(val).sort((a,b) => (a.order||0) - (b.order||0));
+          setMembers(list);
+        });
+        const sHandler = schedulesRef.on("value", (snap) => {
+          const val = snap.val() || {};
+          setSchedules(Object.values(val));
+          setLoading(false);
+          const splash = document.getElementById("splash");
+          if (splash && !splash.classList.contains("fade-out")) {
+            splash.classList.add("fade-out");
+            setTimeout(() => splash.remove(), 350);
+          }
+        });
+
+        const connRef = db.ref(".info/connected");
+        const connHandler = connRef.on("value", (snap) => setConnected(!!snap.val()));
+
+        return () => {
+          membersRef.off("value", mHandler);
+          schedulesRef.off("value", sHandler);
+          connRef.off("value", connHandler);
+        };
+      }, []);
+
+      /* Counts */
+      const counts = useMemo(() => {
+        const c = { office: 0, trip: 0, vacation: 0 };
+        members.forEach((m) => c[getMemberStatus(m.id, schedules).type]++);
+        return c;
+      }, [members, schedules]);
+
+      /* Recent destinations */
+      const recentDestinations = useMemo(() => {
+        const seen = new Set(); const list = [];
+        [...schedules].filter((s) => s.type === "trip" && s.destination)
+          .sort((a,b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+          .forEach((s) => { if (!seen.has(s.destination)) { seen.add(s.destination); list.push(s.destination); } });
+        return list.slice(0, 8);
+      }, [schedules]);
+
+      const t = today();
+      const visibleSchedules = useMemo(() => {
+        const order = { active: 0, upcoming: 1, past: 2 };
+        const tag = (s) => inRange(t, s.startDate, s.endDate) ? "active" : (t < s.startDate ? "upcoming" : "past");
+        let list = [...schedules];
+        if (tab === "today") list = list.filter((s) => tag(s) !== "past");
+        return list.sort((a,b) => {
+          const ta = tag(a), tb = tag(b);
+          if (ta !== tb) return order[ta] - order[tb];
+          if (ta === "past") return b.endDate.localeCompare(a.endDate);
+          return a.startDate.localeCompare(b.startDate);
+        });
+      }, [schedules, tab, t]);
+
+      /* Actions */
+      const addSchedule = async (rec) => {
+        try { await db.ref(`schedules/${rec.id}`).set(rec); setScheduleOpen(false); }
+        catch (e) { alert("저장 실패: " + e.message); }
+      };
+      const deleteSchedule = async (id) => {
+        if (!window.confirm("이 일정을 삭제할까요?")) return;
+        try { await db.ref(`schedules/${id}`).remove(); }
+        catch (e) { alert("삭제 실패: " + e.message); }
+      };
+      const saveMembers = async (list) => {
+        const obj = {}; list.forEach((m, i) => { obj[m.id] = { ...m, order: i }; });
+        try { await membersRef.set(obj); }
+        catch (e) { alert("저장 실패: " + e.message); }
+      };
+
+      return (
+        <div className="min-h-screen pb-28" style={{ background: C.bg }}>
+          {/* Header */}
+          <div className="sticky top-0 z-30 border-b" style={{ background: C.card, borderColor: C.line }}>
+            <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: C.ink }}>
+                    <Users size={11} color="white" strokeWidth={2.5} />
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: STATUS.trip.main }}>
+                    RX Inc.
+                  </div>
+                  {!connected && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: "#FEF2F2", color: "#B91C1C" }}>OFFLINE</span>
+                  )}
+                </div>
+                <h1 className="text-lg font-bold tracking-tight mt-0.5" style={{ color: C.ink }}>회사 현황</h1>
+                <div className="text-[11px]" style={{ color: C.sub }}>{fmtFull(t)}</div>
+              </div>
+              <button onClick={() => setMembersOpen(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-stone-100"
+                style={{ color: C.sub }} aria-label="멤버 편집">
+                <Settings size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-w-md mx-auto px-4 py-4">
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[{k:"office",v:counts.office},{k:"trip",v:counts.trip},{k:"vacation",v:counts.vacation}].map(({k,v}) => {
+                const s = STATUS[k]; const Icon = s.icon;
+                return (
+                  <div key={k} className="rounded-xl p-3 border"
+                    style={{ background: v > 0 ? s.softBg : C.card, borderColor: v > 0 ? s.soft : C.line }}>
+                    <div className="flex items-center gap-1">
+                      <Icon size={11} style={{ color: s.main }} strokeWidth={2.5} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: s.text }}>
+                        {s.label}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-1"
+                      style={{ color: s.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span className="text-2xl font-bold tabular-nums">{v}</span>
+                      <span className="text-[11px] font-semibold opacity-70">명</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Schedules */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2.5">
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: C.sub }}>Schedules</h2>
+                <div className="flex items-center gap-1 p-0.5 rounded-lg border"
+                  style={{ background: C.card, borderColor: C.line }}>
+                  {[{k:"today",label:"진행·예정"},{k:"all",label:"전체"}].map((x) => (
+                    <button key={x.k} onClick={() => setTab(x.k)}
+                      className="px-2.5 py-1 rounded text-[11px] font-bold"
+                      style={{ background: tab === x.k ? C.ink : "transparent",
+                        color: tab === x.k ? "white" : C.sub }}>
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <MiniCalendar schedules={schedules} members={members} />
+
+              {/* Schedule list */}
+              {visibleSchedules.length === 0 ? (
+                <div className="rounded-xl border-2 border-dashed py-8 text-center" style={{ borderColor: C.line }}>
+                  <Calendar size={22} className="mx-auto mb-2" color={C.sub} strokeWidth={1.8} />
+                  <div className="text-sm font-semibold" style={{ color: C.ink }}>등록된 일정이 없습니다</div>
+                  <div className="text-xs mt-0.5" style={{ color: C.sub }}>아래 + 버튼으로 등록하세요</div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {visibleSchedules.map((s) => (
+                    <ScheduleRow key={s.id} schedule={s}
+                      member={members.find((m) => m.id === s.memberId)} onDelete={deleteSchedule} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Team Members */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2.5">
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: C.sub }}>
+                  Team Members · {members.length}
+                </h2>
+                <button onClick={() => setMembersOpen(true)}
+                  className="text-[11px] font-semibold flex items-center gap-0.5" style={{ color: C.sub }}>
+                  편집 <ChevronRight size={12} />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {loading ? (
+                  <div className="text-center py-10 text-sm" style={{ color: C.sub }}>불러오는 중…</div>
+                ) : (
+                  members.map((m) => <MemberCard key={m.id} member={m} schedules={schedules} />)
+                )}
+              </div>
+            </div>
+
+            <div className="mt-10 text-center text-[10px]"
+              style={{ color: C.sub, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+              RX-TEAM-BOARD · Firebase 실시간 동기화
+            </div>
+          </div>
+
+          {/* FAB */}
+          <button onClick={() => setScheduleOpen(true)}
+            className="fixed bottom-5 right-5 sm:right-[calc(50%-14rem)] h-14 px-5 rounded-full shadow-xl flex items-center gap-2 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95 z-40"
+            style={{ background: C.ink, boxShadow: "0 10px 30px rgba(14,26,43,0.3)" }}>
+            <Plus size={20} strokeWidth={2.8} /> 일정 등록
+          </button>
+
+          <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)}
+            onSave={addSchedule} members={members} destinations={recentDestinations} />
+          <MembersModal open={membersOpen} onClose={() => setMembersOpen(false)}
+            members={members} onSave={saveMembers} />
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW failed:', e));
+      });
+    }
+  </script>
 </body>
 </html>
